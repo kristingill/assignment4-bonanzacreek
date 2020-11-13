@@ -15,6 +15,7 @@ library(ggplot2)
 library(kableExtra)
 library(knitr)
 library(effsize)
+library(broom)
 ```
 
 ```{r, include = FALSE}
@@ -152,11 +153,15 @@ difference_mean <- male_mean - female_mean
 
 ```{r}
 # vectors for t-test
-juvenile_f <- juvenile_weight %>% 
+juvenile_sex <- juvenile_weight %>% 
+  select(!grid) %>% 
+  filter(weight != "NA")
+
+juvenile_f <- juvenile_sex %>% 
   filter(sex == "Female") %>% 
   pull(weight)
 
-juvenile_m <- juvenile_weight %>% 
+juvenile_m <- juvenile_sex %>% 
   filter(sex == "Male") %>% 
   pull(weight)
 
@@ -165,11 +170,11 @@ juvenile_ttest <- t.test(juvenile_f, juvenile_m)
 juvenile_ttest
 
 # Cohen's d
-cohen.d(juvenile_f, juvenile_m)
+cohen.d(juvenile_m, juvenile_f)
 
 ```
 
-```{r}
+```{r, include = FALSE}
 # Histograms
 ggplot(data = juvenile_weight, aes(x = weight)) +
   geom_histogram(bins = 10) +
@@ -181,4 +186,50 @@ ggplot(data = juvenile_weight, aes(sample = weight)) +
   facet_wrap(~sex)
 ```
 
-For each location, the male juvenile snowshoe hares have higher average weights than the female juvenile snowshoe hares. Overall, the males have a higher mean weight than the females. The difference in means is 90.468 grams. From the two-sample t-test, the p-value is 0.0071. This is very small and indicates that there is only a 0.71% chance that we could have gotten sample means this different if these sample came from populations with the same mean. This does not give evidence to support the null hypothesis that the difference in means is equal to zero.  
+For each location, the male juvenile snowshoe hares have higher average weights than the female juvenile snowshoe hares. Overall, the males have a higher mean weight than the females. The difference in means is 90.468 grams. From the two-sample t-test, the p-value is 0.0071. This is very small and indicates that there is only a 0.71% chance that we could have gotten sample means this different if these sample came from populations with the same mean. This does not give evidence to support the null hypothesis that the difference in means is equal to zero. However, the Cohen's d test shows us that the effect size is small/moderate-leaning (0.29), so the difference in the means between male and females is not very large. The females had a larger sample size than the males, so this must have impacted the t-test. The effect size is less influenced by the sample size.
+
+### Relationship between Juvenile Wiehgt and Hind Foot Length 
+
+```{r, fig.cap = "Figure 4: The relationship between juvenile snowshoe hare weight (grams) and hind foot length. Data from: Kielland, K., F.S. Chapin, R.W. Ruess, and Bonanza Creek LTER. 2017. Snowshoe hare physical data in Bonanza Creek Experimental Forest: 1999-Present ver 22. Environmental Data Initiative. https://doi.org/10.6073/pasta/03dce4856d79b91557d8e6ce2cbcdc14"}
+# juvenile hare weight and hind foot length 
+juvenile_weight_hindfoot <- juvenile_hare %>% 
+  select(year, weight, hindft, grid, sex) %>% 
+mutate(grid = case_when(
+    grid == "bonbs" ~ "Bonanza Black Spruce",
+    grid == "bonmat" ~ "Bonanza Mature",
+    grid == "bonrip" ~ "Bonanza Riparian")) %>% 
+  mutate(sex = case_when(
+    sex == "f" ~ "Female",
+    sex == "m" ~ "Male"))
+
+# correlation graph
+ggplot(data = juvenile_weight_hindfoot, aes(x = weight,
+                                            y = hindft)) +
+  geom_point(aes(color = sex)) +
+  labs(x = "Weight (grams)",
+       y = "Hind Foot Length",
+       title = "Relationship between Juvenile Snowshoe Hare Weight and Hind Foot Length")
+```
+
+```{r}
+# Linear Regression
+# linear model
+hare_lm <- lm(weight ~ hindft, data = juvenile_weight_hindfoot)
+summary(hare_lm)
+
+# get the linear equation
+hare_lm_tidy <- broom::tidy(hare_lm)
+
+hare_int <- hare_lm_tidy$estimate[1]
+hare_int
+
+hare_coef <- hare_lm_tidy$estimate[2]
+hare_coef
+
+hare_lm_out <- broom::glance(hare_lm)
+hare_lm_out
+
+plot(hare_lm)
+```
+
+
