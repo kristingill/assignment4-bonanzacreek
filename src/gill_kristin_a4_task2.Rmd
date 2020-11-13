@@ -1,0 +1,184 @@
+---
+title: "Exploratory Report Bonanza Creek Hares"
+author: "Kristin Gill"
+date: "11/12/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+library(tidyverse)
+library(janitor)
+library(here)
+library(lubridate)
+library(ggplot2)
+library(kableExtra)
+library(knitr)
+library(effsize)
+```
+
+```{r, include = FALSE}
+# read in the data
+bonanza_hare <- read_csv(here("data", "bonanza_hares.csv"))
+```
+
+## Introduction (TODO)
+4-5 sentences 
+what this study is exploring
+basic background information
+site and study (with citations)
+brief overview of what is included in this report 
+
+## Data and Analyses (TODO)
+3-4 sentences
+describe data, include citation and credit
+overview of main analysis, statistical methods, and tools used
+
+## Exploratory Findings
+### Annual Juvenile Hare Trap Counts
+```{r, fig.cap = "Figure 1: The number of juvenile snowshoe hare trappings at Bonanza Creek Experimental Forest from 1999 to 2012. The trappings are an indication of population size. Data from: Kielland, K., F.S. Chapin, R.W. Ruess, and Bonanza Creek LTER. 2017. Snowshoe hare physical data in Bonanza Creek Experimental Forest: 1999-Present ver 22. Environmental Data Initiative. https://doi.org/10.6073/pasta/03dce4856d79b91557d8e6ce2cbcdc14"}
+# have data only include hares with age "j"
+juvenile_hare <- bonanza_hare %>% 
+  filter(age == "j") %>% 
+  # change date to ymd and create a column with year
+  mutate(date = mdy(date)) %>% 
+  mutate(year = year(date))
+
+# separate data set
+juvenile_by_year <- juvenile_hare %>% 
+  # count by year
+  count(year)
+
+# a visualization of the data
+ggplot(data = juvenile_by_year, aes(x = year,
+                                 y = n)) +
+  geom_col(fill = "#009E73") +
+  labs(x = "Time (Years)",
+       y = "Number of Juvenile Hare Trappings",
+       title = "Number of Juvenile Snowshoe Hare Trappings, Bonanza Creek 1999-2012") +
+  theme_light()
+```
+
+```{r}
+# summary statistics 
+summary_juvenile <- juvenile_by_year %>% 
+  summarize(average = mean(n),
+            median = median(n),
+            minimum = min(n),
+            maximum = max(n)) 
+kbl(summary_juvenile, caption = "Table 1: Summary Statistics for Juvenile Snowshoe Hares") %>%
+  kable_styling(latex_options = c("striped", "hold_position"),
+                full_width = F)
+```
+
+The number of juvenile snowshoe hare trappings at Bonanza Creek was much lower in 2012 compared to 1999. The maximum number of trappings was 126 (1999) and the minimum was 2 (2010). The average number of juvenile hares trapped each year was 31.5, while the median was 18.5. The amount of effort put in each year may affect these counts. In future analyses, counts should be standardized by the number of days put into trapping snowshoe hares each year. 
+
+### Visualizing Juvenile Hare Weights
+
+```{r, fig.cap = "Figure 2: The scatterplots for each location show the individual weights of the hares, with color defining male or female. The boxplots on top show the spread and median of the data for males and females at each location. The weight is in grams. The sex was not recorded for some of the juvenile snowshoe hairs, and this is shown as NA. The Bonanza Black Spruce is a location with black spruce trees. The Bonanza Mature location has mature white spruce, paper birch, alder, and black spruce trees. The Bonanza Riparian location is in a flood zone. Data from: Kielland, K., F.S. Chapin, R.W. Ruess, and Bonanza Creek LTER. 2017. Snowshoe hare physical data in Bonanza Creek Experimental Forest: 1999-Present ver 22. Environmental Data Initiative. https://doi.org/10.6073/pasta/03dce4856d79b91557d8e6ce2cbcdc14"}
+# compare juvenile hare weights by sex and site(grid)
+juvenile_weight <- juvenile_hare %>% 
+  select(grid, sex, weight) %>% 
+  mutate(grid = case_when(
+    grid == "bonbs" ~ "Bonanza Black Spruce",
+    grid == "bonmat" ~ "Bonanza Mature",
+    grid == "bonrip" ~ "Bonanza Riparian")) %>% 
+  mutate(sex = case_when(
+    sex == "f" ~ "Female",
+    sex == "m" ~ "Male"))
+
+# creating visualization
+ggplot(data = juvenile_weight, aes(x = sex,
+                                   y = weight)) +
+  geom_boxplot() +
+  facet_wrap(~grid) +
+  labs(x = "Sex of Juvenile Snowshoe Hares",
+       y = "Weight (grams)",
+       title = "Weights of Juvenile Snowshoe Hares Compared by Sex and Location") +
+  geom_jitter(aes(color = sex), show.legend = FALSE) +
+  theme_bw()
+```
+
+```{r, fig.cap = "Figure 3: The Histograms for each location show the count of snowshoe hares for different weights. The colors differentiate male, female, and NA. Data from: Kielland, K., F.S. Chapin, R.W. Ruess, and Bonanza Creek LTER. 2017. Snowshoe hare physical data in Bonanza Creek Experimental Forest: 1999-Present ver 22. Environmental Data Initiative. https://doi.org/10.6073/pasta/03dce4856d79b91557d8e6ce2cbcdc14"}
+# histogram of mean weights
+ggplot(data = juvenile_weight, aes(x = weight)) +
+  geom_histogram(aes(fill = sex),
+                 bin = 20) +
+  labs(x = "Weight (grams)",
+       y = "Number of Juvenile Snowshoe Hares",
+       title = "Number of Snowshoe Hares by Weight (grams)") +
+  facet_wrap(~grid)
+```
+
+Figure 2 shows that male juvenile snowshoe hares weigh more than female juvenile snowshoe hares.The box plots indicate that while the data are fairly spread, the medians are higher for the male weight compared to the female weight. The horizontal bar across the box on the plot shows the median, and it is higher for males at all three locations. Figure 3 shows the sample sizes vary greatly from location to location, with Bonanza Riparian having the highest sample sizes. The data is more normally distributed for Bonanza Riparian due to the higher sample sizes. More females were trapped than males; females have higher sample sizes/counts.
+
+### Juvenile Weight Comparison
+
+```{r}
+# summary statistics: table of means
+juvenile_weight_stats <- juvenile_weight %>% 
+  filter(weight != "NA") %>%
+  group_by(grid, sex) %>% 
+  summarize(
+    mean = mean(weight),
+    sample_size = n(),
+    standard_deviation = sd(weight)
+  )
+
+kbl(juvenile_weight_stats, caption = "Table 2: The summary statistics for juvenile snowshoe hares, including mean, sample size, and standard deviation of weight (grams) for males and females in three locations. The locations are Bonanza Riparian, Bonanaza Mature, and Bonanaza Black Spruce.") %>%
+  kable_styling(latex_options = c("striped", "hold_position"),
+                full_width = F)
+
+# summary of means without grid location
+juvenile_weight_mean <- juvenile_weight %>% 
+  filter(weight != "NA") %>%
+  group_by(sex) %>% 
+  summarize(
+    mean = mean(weight),
+    sample_size = n(),
+    standard_deviation = sd(weight)
+  )
+kbl(juvenile_weight_mean, caption = "Table 3: The mean weights (grams), standard deviations, and sample sizes for male and female juvenile snowshoe hares.") %>%
+  kable_styling(latex_options = c("striped", "hold_position"),
+                full_width = F)
+```
+
+```{r, include = FALSE}
+# Difference in Means
+female_mean <- juvenile_weight_mean$mean[1]
+male_mean <- juvenile_weight_mean$mean[2]
+difference_mean <- male_mean - female_mean
+```
+
+```{r}
+# vectors for t-test
+juvenile_f <- juvenile_weight %>% 
+  filter(sex == "Female") %>% 
+  pull(weight)
+
+juvenile_m <- juvenile_weight %>% 
+  filter(sex == "Male") %>% 
+  pull(weight)
+
+# two sample t-test
+juvenile_ttest <- t.test(juvenile_f, juvenile_m)
+juvenile_ttest
+
+# Cohen's d
+cohen.d(juvenile_f, juvenile_m)
+
+```
+
+```{r}
+# Histograms
+ggplot(data = juvenile_weight, aes(x = weight)) +
+  geom_histogram(bins = 10) +
+  facet_wrap(~sex)
+
+# Quanitle-quantile plot
+ggplot(data = juvenile_weight, aes(sample = weight)) +
+  geom_qq() +
+  facet_wrap(~sex)
+```
+
+For each location, the male juvenile snowshoe hares have higher average weights than the female juvenile snowshoe hares. Overall, the males have a higher mean weight than the females. The difference in means is 90.468 grams. From the two-sample t-test, the p-value is 0.0071. This is very small and indicates that there is only a 0.71% chance that we could have gotten sample means this different if these sample came from populations with the same mean. This does not give evidence to support the null hypothesis that the difference in means is equal to zero.  
